@@ -44,12 +44,12 @@ export function createSimpleTiles() {
     const tiles = [];
 
     // 1. Deep Ocean (Connects only to itself and Water)
-    const tDeep = new Tile("Deep", images["deep"], ["D", "D", "D", "D"], 2);
+    const tDeep = new Tile("Deep", images["deep"], ["D", "D", "D", "D"], 1);
     tDeep.color = "#1a237e";
     tiles.push(tDeep);
 
     // 2. Water (Connects to Deep, Water, Sand)
-    const tWater = new Tile("Water", images["water"], ["W", "W", "W", "W"], 5);
+    const tWater = new Tile("Water", images["water"], ["W", "W", "W", "W"], 4);
     tWater.color = "#0288d1";
     tiles.push(tWater);
 
@@ -59,44 +59,44 @@ export function createSimpleTiles() {
     tiles.push(tSand);
 
     // 4. Grass (Connects to Sand, Grass, Forest)
-    const tGrass = new Tile("Grass", images["grass"], ["G", "G", "G", "G"], 5);
+    const tGrass = new Tile("Grass", images["grass"], ["G", "G", "G", "G"], 20);
     tGrass.color = "#7cb342";
     tiles.push(tGrass);
 
     // 5. Forest (Connects to Grass, Forest)
-    const tForest = new Tile("Forest", images["forest"], ["F", "F", "F", "F"], 3);
+    const tForest = new Tile("Forest", images["forest"], ["F", "F", "F", "F"], 6);
     tForest.color = "#33691e";
     tiles.push(tForest);
 
     // 6. Mountain
-    const tMountain = new Tile("Mountain", images["mountain"], ["M", "M", "M", "M"], 2);
+    const tMountain = new Tile("Mountain", images["mountain"], ["M", "M", "M", "M"], 3);
     tMountain.color = "#9e9e9e";
     tiles.push(tMountain);
 
     // --- Transitions ---
 
     // Deep/Water Corner
-    const dwc = new Tile("Deep_Water_Corner", images["deep"], ["D", "D", "W", "W"], 2);
+    const dwc = new Tile("Deep_Water_Corner", images["deep"], ["D", "D", "W", "W"], 1);
     dwc.color = "#0d47a1";
     tiles.push(dwc);
 
     // Water/Sand Corner
-    const wsc = new Tile("Water_Sand_Corner", images["water"], ["W", "W", "S", "S"], 2);
+    const wsc = new Tile("Water_Sand_Corner", images["water"], ["W", "W", "S", "S"], 1);
     wsc.color = "#4fc3f7";
     tiles.push(wsc);
 
     // Sand/Grass Corner
-    const sgc = new Tile("Sand_Grass_Corner", images["sand"], ["S", "S", "G", "G"], 2);
+    const sgc = new Tile("Sand_Grass_Corner", images["sand"], ["S", "S", "G", "G"], 1);
     sgc.color = "#cddc39";
     tiles.push(sgc);
 
     // Grass/Forest Corner
-    const gfc = new Tile("Grass_Forest_Corner", images["grass"], ["G", "G", "F", "F"], 2);
+    const gfc = new Tile("Grass_Forest_Corner", images["grass"], ["G", "G", "F", "F"], 1);
     gfc.color = "#558b2f";
     tiles.push(gfc);
 
     // Mountain/Grass Corner
-    const mgc = new Tile("Mountain_Grass_Corner", images["mountain"], ["M", "M", "G", "G"], 2);
+    const mgc = new Tile("Mountain_Grass_Corner", images["mountain"], ["M", "M", "G", "G"], 1);
     mgc.color = "#bdbdbd";
     tiles.push(mgc);
 
