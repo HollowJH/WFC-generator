@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave Function Collapse Visualizer</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="loadingOverlay">
+        <h2>Loading Assets...</h2>
+    </div>
+
+    <div id="godModeOverlay" class="hidden">
+        <div class="overlay-content">
+            <h3>Select Tile</h3>
+            <div id="tileOptions" class="tile-grid"></div>
+            <button id="btnCloseOverlay">Cancel</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>Wave Function Collapse</h1>
+            <p>Simple Tiled Model Visualization</p>
+        </header>
+
+        <main>
+            <div class="canvas-container">
+                <canvas id="wfcCanvas" width="600" height="600"></canvas>
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label>Grid Size:</label>
+                    <input type="number" id="dimInput" value="10" min="2" max="50">
+                </div>
+
+                <div class="control-group">
+                    <label>Speed (FPS):</label>
+                    <input type="range" id="speedSlider" min="1" max="60" value="30">
+                </div>
+
+                <div class="button-group">
+                    <button id="btnReset">Reset</button>
+                    <button id="btnStep">Step</button>
+                    <button id="btnRun">Auto Run</button>
+                </div>
+
+                <div class="button-group">
+                    <button id="btnSaveImg">Save Image</button>
+                    <button id="btnExport">Export JSON</button>
+                </div>
+
+                <div class="status-panel">
+                    <p>Status: <span id="statusText">Ready</span></p>
+                    <p>Remaining: <span id="remainingText">-</span></p>
+                    <p>Stack Depth: <span id="stackDepthText">0</span></p>
+                </div>
+            </div>
+        </main>
+
+        <div class="legend">
+            <h3>Tiles</h3>
+            <div id="tileLegend"></div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
