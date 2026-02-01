@@ -70,9 +70,8 @@ function initTiles() {
             const rot = t.rotate(i);
 
             // Optimization: Don't add if identical to existing (e.g. Sea rotated is still Sea)
-            // But checking equality of sockets is O(1) here (4 strings)
+            // Checking equality of sockets is O(1) here (4 strings)
             const isDuplicate = allTiles.some(existing =>
-                existing.name === rot.name &&
                 existing.sockets[0] === rot.sockets[0] &&
                 existing.sockets[1] === rot.sockets[1] &&
                 existing.sockets[2] === rot.sockets[2] &&
