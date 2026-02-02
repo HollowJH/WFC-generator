@@ -42,6 +42,20 @@ window.onload = async () => {
     canvas.addEventListener('click', handleCanvasClick);
     document.getElementById('btnCloseOverlay').addEventListener('click', hideGodModeOverlay);
 
+    // Click outside to close God Mode
+    document.getElementById('godModeOverlay').addEventListener('click', (e) => {
+        if (e.target.id === 'godModeOverlay') {
+            hideGodModeOverlay();
+        }
+    });
+
+    // Escape to close God Mode
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            hideGodModeOverlay();
+        }
+    });
+
     // Wait for assets before initializing
     await assetLoadPromise;
 
@@ -353,7 +367,11 @@ function showGodModeOverlay(index) {
         img.src = tempCanvas.toDataURL();
         img.title = tile.name;
 
+        const label = document.createElement('span');
+        label.textContent = `${tile.name}${tile.rotation > 0 ? ` (${tile.rotation * 90}°)` : ''}`;
+
         btn.appendChild(img);
+        btn.appendChild(label);
         btn.addEventListener('click', () => selectTile(tile));
         optionsDiv.appendChild(btn);
     });
