@@ -49,6 +49,13 @@ This architecture demonstrates how software engineering patterns can solve algor
 -   `js/main.js`: Visualization and rendering logic (Controller/View).
 -   `css/style.css`: Styling for the interface.
 
+## Portfolio Modules
+This repository contains multiple engineering demonstrations:
+
+1.  **Wave Function Collapse** (Current Directory): Constraint-based procedural generation.
+2.  **[Verlet Physics Engine](./physics_engine/)**: Deterministic physics simulation demonstrating integration methods.
+3.  **[Spatial Partitioning](./spatial_partitioning/)**: Quadtree implementation for optimizing collision detection ($O(N \log N)$).
+
 ## Running the Project
 Since this uses ES6 Modules, you cannot run it directly from the file system (file://) due to CORS restrictions in modern browsers.
 

@@ -17,6 +17,35 @@ body {
     min-height: 100vh;
 }
 
+.portfolio-nav {
+    background-color: var(--panel-bg);
+    padding: 15px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+}
+
+.portfolio-nav a {
+    color: #888;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s, transform 0.2s;
+    font-size: 0.95rem;
+}
+
+.portfolio-nav a:hover {
+    color: var(--text-color);
+    transform: translateY(-1px);
+}
+
+.portfolio-nav a.active {
+    color: var(--accent-color);
+    font-weight: bold;
+}
+
 .container {
     max-width: 1000px;
     width: 100%;
