@@ -8,6 +8,14 @@ A JavaScript implementation of the **Wave Function Collapse (WFC)** algorithm us
 3.  **Collapse**: That cell is forced to choose one tile randomly.
 4.  **Propagation**: The constraints (sockets) of the chosen tile propagate to neighbors, removing invalid options. This chain reaction ensures global consistency.
 
+## Algorithmic Highlights
+This implementation goes beyond the basic WFC algorithm by incorporating several advanced techniques to ensure efficiency and robustness:
+
+-   **Optimization (Min-Heap Priority Queue)**: Instead of a naive $O(N)$ scan to find the cell with the lowest entropy, we utilize a Min-Heap. This reduces the complexity of retrieving the next cell to $O(1)$ and updating entropy to $O(\log N)$. We employ a **"Lazy Deletion"** strategy to handle stale heap entries efficiently.
+-   **Robustness (Backtracking History Stack)**: WFC can often reach a "contradiction" (a state where a cell has zero valid options). Our solver tracks the state history in a stack, allowing it to backtrack and attempt different choices when a dead end is encountered, significantly increasing the success rate of generation.
+-   **Organic Generation (Weighted Entropy)**: To avoid "noisy" outputs, the algorithm uses Shannon Entropy weighted by tile frequency. We specifically tuned the weights to favor land tiles, resulting in coherent 70% landmasses rather than fragmented islands.
+-   **Tools Programming (God Mode Debugger)**: The project includes an interactive debugger that allows manual constraint enforcement. Users can "paint" tiles to force the algorithm to solve around specific seeds, demonstrating the power of constraint-based procedural generation.
+
 ## Project Structure
 -   `index.html`: Main entry point.
 -   `js/wfc.js`: Core algorithm (Model). Decoupled from UI.

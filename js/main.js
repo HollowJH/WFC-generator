@@ -13,6 +13,7 @@ let canvas, ctx;
 let isRunning = false;
 let autoRunId = null;
 let lastTime = 0;
+let showEntropy = false;
 
 // --- Setup ---
 window.onload = async () => {
@@ -32,6 +33,11 @@ window.onload = async () => {
     });
     document.getElementById('speedSlider').addEventListener('input', (e) => {
         FPS = parseInt(e.target.value);
+    });
+
+    document.getElementById('chkEntropy').addEventListener('change', (e) => {
+        showEntropy = e.target.checked;
+        draw();
     });
 
     // Portfolio Features
@@ -239,56 +245,76 @@ function draw() {
 
     const cellSize = CANVAS_SIZE / GRID_DIM;
 
+    // Pre-calculate max entropy for normalization
+    // Shannon entropy max is log(N) where N is number of choices (if weights are equal)
+    const maxH = Math.log(allTiles.length);
+
     for (let i = 0; i < model.grid.length; i++) {
         const cell = model.grid[i];
         const x = (i % GRID_DIM) * cellSize;
         const y = Math.floor(i / GRID_DIM) * cellSize;
 
-        if (cell.collapsed) {
-            // Draw the single chosen tile
-            const tile = cell.options[0];
-            drawTile(tile, x, y, cellSize);
+        if (showEntropy) {
+            const h = cell.entropy();
+            const ratio = Math.min(1, h / maxH);
+            const val = Math.floor(ratio * 255);
+            ctx.fillStyle = `rgb(${val}, ${val}, ${val})`;
+            ctx.fillRect(x, y, cellSize, cellSize);
+
+            if (cellSize > 20) {
+                ctx.fillStyle = ratio > 0.5 ? "#000" : "#fff";
+                ctx.font = `${Math.floor(cellSize / 3)}px sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(cell.options.length, x + cellSize / 2, y + cellSize / 2);
+            }
         } else {
-            // Draw superposition state
-            if (cell.options.length === 0) {
-                // Failed state
-                ctx.fillStyle = "#400";
-                ctx.fillRect(x, y, cellSize, cellSize);
-                ctx.strokeStyle = "red";
-                ctx.beginPath();
-                ctx.moveTo(x, y); ctx.lineTo(x + cellSize, y + cellSize);
-                ctx.moveTo(x + cellSize, y); ctx.lineTo(x, y + cellSize);
-                ctx.stroke();
-            } else if (cell.options.length <= 4) {
-                // Draw up to 4 options with transparency
-                const originalAlpha = ctx.globalAlpha;
-                ctx.globalAlpha = 1.0 / cell.options.length;
-                for (const tile of cell.options) {
-                    drawTile(tile, x, y, cellSize);
-                }
-                ctx.globalAlpha = originalAlpha;
+            if (cell.collapsed) {
+                // Draw the single chosen tile
+                const tile = cell.options[0];
+                drawTile(tile, x, y, cellSize);
             } else {
-                // Average color
-                let r=0, g=0, b=0;
-                cell.options.forEach(t => {
-                    const rgb = hexToRgb(t.color || "#000000");
-                    r += rgb.r;
-                    g += rgb.g;
-                    b += rgb.b;
-                });
-                r = Math.floor(r / cell.options.length);
-                g = Math.floor(g / cell.options.length);
-                b = Math.floor(b / cell.options.length);
+                // Draw superposition state
+                if (cell.options.length === 0) {
+                    // Failed state
+                    ctx.fillStyle = "#400";
+                    ctx.fillRect(x, y, cellSize, cellSize);
+                    ctx.strokeStyle = "red";
+                    ctx.beginPath();
+                    ctx.moveTo(x, y); ctx.lineTo(x + cellSize, y + cellSize);
+                    ctx.moveTo(x + cellSize, y); ctx.lineTo(x, y + cellSize);
+                    ctx.stroke();
+                } else if (cell.options.length <= 4) {
+                    // Draw up to 4 options with transparency
+                    const originalAlpha = ctx.globalAlpha;
+                    ctx.globalAlpha = 1.0 / cell.options.length;
+                    for (const tile of cell.options) {
+                        drawTile(tile, x, y, cellSize);
+                    }
+                    ctx.globalAlpha = originalAlpha;
+                } else {
+                    // Average color
+                    let r = 0, g = 0, b = 0;
+                    cell.options.forEach(t => {
+                        const rgb = hexToRgb(t.color || "#000000");
+                        r += rgb.r;
+                        g += rgb.g;
+                        b += rgb.b;
+                    });
+                    r = Math.floor(r / cell.options.length);
+                    g = Math.floor(g / cell.options.length);
+                    b = Math.floor(b / cell.options.length);
 
-                ctx.fillStyle = `rgb(${r},${g},${b})`;
-                ctx.fillRect(x, y, cellSize, cellSize);
+                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                    ctx.fillRect(x, y, cellSize, cellSize);
 
-                if (cellSize > 20) {
-                    ctx.fillStyle = "rgba(255,255,255,0.5)";
-                    ctx.font = `${Math.floor(cellSize/3)}px sans-serif`;
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
-                    ctx.fillText(cell.options.length, x + cellSize/2, y + cellSize/2);
+                    if (cellSize > 20) {
+                        ctx.fillStyle = "rgba(255,255,255,0.5)";
+                        ctx.font = `${Math.floor(cellSize / 3)}px sans-serif`;
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText(cell.options.length, x + cellSize / 2, y + cellSize / 2);
+                    }
                 }
             }
         }

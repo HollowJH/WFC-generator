@@ -123,6 +123,20 @@ input[type="range"] {
     cursor: pointer;
 }
 
+.toggle-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.toggle-control input {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+}
+
 .status-panel p {
     margin: 5px 0;
     font-size: 0.9rem;
