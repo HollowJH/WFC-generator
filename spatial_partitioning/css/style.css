@@ -1,42 +1,68 @@
+:root {
+    --bg-color: #1a1a1a;
+    --panel-bg: #2d2d2d;
+    --text-color: #e0e0e0;
+    --accent-color: #9c27b0; /* Purple for Quadtree */
+    --accent-hover: #7b1fa2;
+}
+
 body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
     margin: 0;
-    overflow: hidden;
-    background-color: #050505;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #eee;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1000px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+header {
+    text-align: center;
+}
+
+header h1 {
+    color: var(--accent-color);
+    font-weight: 300;
+}
+
+.canvas-container {
+    background-color: var(--panel-bg);
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    display: flex;
+    justify-content: center;
 }
 
 canvas {
-    display: block;
+    background-color: #000;
+    border: 1px solid #444;
 }
 
-.ui {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    padding: 15px;
-    background: rgba(20, 20, 20, 0.8);
+.controls {
+    background-color: var(--panel-bg);
+    padding: 20px;
     border-radius: 8px;
-    border: 1px solid #333;
-    pointer-events: auto;
-}
-
-h1 {
-    margin: 0 0 15px 0;
-    font-size: 18px;
-    font-weight: 400;
-    color: #00ffcc;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-width: 300px;
+    margin: 0 auto;
 }
 
 .control-group {
-    margin-bottom: 10px;
-}
-
-label {
-    display: block;
-    font-size: 12px;
-    margin-bottom: 5px;
-    opacity: 0.8;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }
 
 input[type="range"] {
@@ -44,14 +70,8 @@ input[type="range"] {
     cursor: pointer;
 }
 
-.stats {
-    margin-top: 15px;
-    padding-top: 10px;
-    border-top: 1px solid #333;
-}
-
-.stats p {
-    margin: 0;
-    font-family: monospace;
-    font-size: 14px;
+label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }

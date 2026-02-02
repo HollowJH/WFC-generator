@@ -7,12 +7,23 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <canvas id="canvas"></canvas>
-    <div class="ui">
-        <h1>Verlet Physics Engine</h1>
-        <p>Click to add particles</p>
-        <button id="reset-btn">Reset</button>
+    <div class="container">
+        <header>
+            <h1>Verlet Integration Physics</h1>
+            <p>Deterministic physics simulation using Verlet integration.</p>
+        </header>
+
+        <main>
+            <div class="canvas-container">
+                <canvas id="physicsCanvas" width="800" height="600"></canvas>
+            </div>
+
+            <div class="controls">
+                <button id="btnReset">Reset Simulation</button>
+            </div>
+        </main>
     </div>
+
     <script type="module" src="js/main.js"></script>
 </body>
 </html>

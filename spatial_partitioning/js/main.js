@@ -1,108 +1,124 @@
-import { Quadtree, Rectangle, Point } from './quadtree.js';
+import { Quadtree, Rectangle } from './quadtree.js';
 
-const canvas = document.getElementById('canvas');
+const canvas = document.getElementById('quadCanvas');
 const ctx = canvas.getContext('2d');
-const countSlider = document.getElementById('particle-count');
-const countVal = document.getElementById('count-val');
-const showQT = document.getElementById('show-quadtree');
-const fpsVal = document.getElementById('fps');
+const width = canvas.width;
+const height = canvas.height;
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+let particles = [];
+let count = 100;
+let showQuadtree = true;
+let qtree;
 
 class Particle {
     constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
         this.vx = (Math.random() - 0.5) * 2;
         this.vy = (Math.random() - 0.5) * 2;
-        this.r = 2;
+        this.r = 4;
         this.highlight = false;
     }
 
-    update() {
+    move() {
         this.x += this.vx;
         this.y += this.vy;
 
-        if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
-        if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+        if (this.x < 0 || this.x > width) this.vx *= -1;
+        if (this.y < 0 || this.y > height) this.vy *= -1;
 
         this.highlight = false;
     }
 
-    draw() {
-        ctx.fillStyle = this.highlight ? '#ff0055' : '#00ffcc';
+    render() {
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+        ctx.fillStyle = this.highlight ? '#fff' : '#9c27b0';
         ctx.fill();
+    }
+
+    intersects(other) {
+        const d = Math.hypot(this.x - other.x, this.y - other.y);
+        return d < this.r + other.r;
     }
 }
 
-let particles = [];
-let lastTime = 0;
-
-function initParticles(n) {
+function init() {
     particles = [];
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < count; i++) {
         particles.push(new Particle());
     }
 }
 
-function loop(timestamp) {
-    const dt = timestamp - lastTime;
-    lastTime = timestamp;
-    fpsVal.textContent = Math.round(1000 / dt);
+function drawQuadtree(qt) {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+        qt.boundary.x - qt.boundary.w,
+        qt.boundary.y - qt.boundary.h,
+        qt.boundary.w * 2,
+        qt.boundary.h * 2
+    );
 
-    ctx.fillStyle = '#050505';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (qt.divided) {
+        drawQuadtree(qt.northeast);
+        drawQuadtree(qt.northwest);
+        drawQuadtree(qt.southeast);
+        drawQuadtree(qt.southwest);
+    }
+}
 
-    const boundary = new Rectangle(canvas.width / 2, canvas.height / 2, canvas.width / 2, canvas.height / 2);
-    const qt = new Quadtree(boundary, 4);
+function loop() {
+    // Background
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, width, height);
 
-    for (const p of particles) {
-        p.update();
-        qt.insert(new Point(p.x, p.y, p));
+    // Build Quadtree
+    const boundary = new Rectangle(width / 2, height / 2, width / 2, height / 2);
+    qtree = new Quadtree(boundary, 4);
+
+    particles.forEach(p => {
+        p.move();
+        qtree.insert(p);
+    });
+
+    // Collision Detection (Optimized)
+    particles.forEach(p => {
+        const range = new Rectangle(p.x, p.y, p.r * 2, p.r * 2);
+        const others = qtree.query(range);
+
+        for (let other of others) {
+            if (p !== other && p.intersects(other)) {
+                p.highlight = true;
+                other.highlight = true;
+            }
+        }
+    });
+
+    // Draw
+    if (showQuadtree) {
+        drawQuadtree(qtree);
     }
 
-    if (showQT.checked) {
-        qt.show(ctx);
-    }
-
-    // Query example: Mouse range
-    const range = new Rectangle(mouseX, mouseY, 50, 50);
-    ctx.strokeStyle = '#ffffff';
-    ctx.strokeRect(range.x - range.w, range.y - range.h, range.w * 2, range.h * 2);
-
-    const found = qt.query(range);
-    for (const point of found) {
-        point.data.highlight = true;
-    }
-
-    for (const p of particles) {
-        p.draw();
-    }
+    particles.forEach(p => p.render());
 
     requestAnimationFrame(loop);
 }
 
-let mouseX = 0;
-let mouseY = 0;
-canvas.addEventListener('mousemove', (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
+// UI Controls
+const slider = document.getElementById('particleCount');
+const countVal = document.getElementById('countVal');
+
+slider.addEventListener('input', (e) => {
+    count = parseInt(e.target.value);
+    countVal.textContent = count;
+    init();
 });
 
-countSlider.addEventListener('input', (e) => {
-    const n = parseInt(e.target.value);
-    countVal.textContent = n;
-    initParticles(n);
+document.getElementById('toggleQuadtree').addEventListener('change', (e) => {
+    showQuadtree = e.target.checked;
 });
 
-window.addEventListener('resize', () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    initParticles(particles.length);
-});
-
-initParticles(500);
-requestAnimationFrame(loop);
+// Start
+init();
+loop();

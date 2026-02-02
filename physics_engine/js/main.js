@@ -1,102 +1,86 @@
 import { VerletObject } from './verlet.js';
 
-const canvas = document.getElementById('canvas');
+const canvas = document.getElementById('physicsCanvas');
 const ctx = canvas.getContext('2d');
+const width = canvas.width;
+const height = canvas.height;
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+let objects = [];
+const gravity = { x: 0, y: 500 }; // Pixels per second squared
 
-const objects = [];
-const gravity = { x: 0, y: 1000 };
-const dt = 1 / 60;
-const subSteps = 8;
-const subDt = dt / subSteps;
+function init() {
+    objects = [];
+    // Spawn a demo object
+    const obj = new VerletObject(width / 2, 100);
+    // Give it a little initial push (by offsetting oldPos)
+    obj.oldPos.x -= 5;
+    objects.push(obj);
+}
 
-// Initial object
-objects.push(new VerletObject(canvas.width / 2, 100, 20));
+function update(dt) {
+    const subSteps = 8;
+    const subDt = dt / subSteps;
 
-function update() {
     for (let i = 0; i < subSteps; i++) {
-        applyGravity();
-        applyConstraints();
-        updateObjects(subDt);
+        objects.forEach(obj => {
+            obj.accelerate(gravity);
+            applyConstraint(obj);
+            obj.update(subDt);
+        });
     }
 }
 
-function applyGravity() {
-    for (const obj of objects) {
-        obj.accelerate(gravity.x, gravity.y);
-    }
-}
+function applyConstraint(obj) {
+    // Circle constraint
+    const center = { x: width / 2, y: height / 2 };
+    const radius = 250;
 
-function applyConstraints() {
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const radius = Math.min(canvas.width, canvas.height) * 0.4;
+    const dx = obj.pos.x - center.x;
+    const dy = obj.pos.y - center.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
 
-    for (const obj of objects) {
-        const dx = obj.pos.x - centerX;
-        const dy = obj.pos.y - centerY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > radius - obj.radius) {
+        const n = { x: dx / dist, y: dy / dist };
+        const penetration = dist - (radius - obj.radius);
 
-        if (dist > radius - obj.radius) {
-            const nX = dx / dist;
-            const nY = dy / dist;
-            obj.pos.x = centerX + nX * (radius - obj.radius);
-            obj.pos.y = centerY + nY * (radius - obj.radius);
-        }
-    }
-}
-
-function updateObjects(dt) {
-    for (const obj of objects) {
-        obj.update(dt);
+        obj.pos.x -= n.x * penetration;
+        obj.pos.y -= n.y * penetration;
     }
 }
 
 function draw() {
-    ctx.fillStyle = '#111';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Clear background
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, width, height);
 
-    // Draw container
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const radius = Math.min(canvas.width, canvas.height) * 0.4;
-
+    // Draw constraint
+    ctx.strokeStyle = '#444';
     ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = '#555';
-    ctx.lineWidth = 2;
+    ctx.arc(width / 2, height / 2, 250, 0, Math.PI * 2);
     ctx.stroke();
 
     // Draw objects
-    ctx.fillStyle = '#00ff88';
-    for (const obj of objects) {
+    objects.forEach(obj => {
+        ctx.fillStyle = obj.color;
         ctx.beginPath();
         ctx.arc(obj.pos.x, obj.pos.y, obj.radius, 0, Math.PI * 2);
         ctx.fill();
-    }
+    });
 }
 
-function loop() {
-    update();
+// Game Loop
+let lastTime = 0;
+function loop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+
+    update(Math.min(dt, 0.05)); // Cap dt to prevent explosion on tab switch
     draw();
     requestAnimationFrame(loop);
 }
 
-// Add more objects on click
-canvas.addEventListener('mousedown', (e) => {
-    objects.push(new VerletObject(e.clientX, e.clientY, 10 + Math.random() * 15));
-});
-
-document.getElementById('reset-btn').addEventListener('click', () => {
-    objects.length = 0;
-    objects.push(new VerletObject(canvas.width / 2, 100, 20));
-});
-
-window.addEventListener('resize', () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-});
-
-loop();
+// Setup
+document.getElementById('btnReset').addEventListener('click', init);
+init();
+requestAnimationFrame(loop);

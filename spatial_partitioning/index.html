@@ -7,22 +7,31 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <canvas id="canvas"></canvas>
-    <div class="ui">
-        <h1>Spatial Partitioning (Quadtree)</h1>
-        <div class="control-group">
-            <label>Particles: <span id="count-val">500</span></label>
-            <input type="range" id="particle-count" min="10" max="2000" value="500">
-        </div>
-        <div class="control-group">
-            <label>
-                <input type="checkbox" id="show-quadtree" checked> Show Quadtree
-            </label>
-        </div>
-        <div class="stats">
-            <p>FPS: <span id="fps">0</span></p>
-        </div>
+    <div class="container">
+        <header>
+            <h1>Quadtree Spatial Partitioning</h1>
+            <p>Optimize collision detection from O(N²) to O(N log N).</p>
+        </header>
+
+        <main>
+            <div class="canvas-container">
+                <canvas id="quadCanvas" width="800" height="600"></canvas>
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label>Particle Count: <span id="countVal">100</span></label>
+                    <input type="range" id="particleCount" min="10" max="2000" value="100">
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="toggleQuadtree" checked> Show Quadtree
+                    </label>
+                </div>
+            </div>
+        </main>
     </div>
+
     <script type="module" src="js/main.js"></script>
 </body>
 </html>
