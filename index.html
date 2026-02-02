@@ -32,8 +32,16 @@
 
             <div class="controls">
                 <div class="control-group">
+                    <label>Strategy:</label>
+                    <select id="strategySelect">
+                        <option value="snapshot">Debug (Snapshot)</option>
+                        <option value="delta">Fast (Delta)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
                     <label>Grid Size:</label>
-                    <input type="number" id="dimInput" value="10" min="2" max="50">
+                    <input type="number" id="dimInput" value="10" min="2" max="100">
                 </div>
 
                 <div class="control-group">

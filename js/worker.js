@@ -32,9 +32,9 @@ self.onmessage = function(e) {
 
     switch (type) {
         case 'INIT':
-            const { gridDim, weights } = payload;
+            const { gridDim, weights, strategy } = payload;
             initTiles(weights);
-            model = new WFCModel(gridDim, allTiles);
+            model = new WFCModel(gridDim, allTiles, strategy || "snapshot");
             sendUpdate();
             break;
 

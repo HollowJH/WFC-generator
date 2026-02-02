@@ -31,8 +31,20 @@ window.onload = async () => {
     document.getElementById('btnStep').addEventListener('click', step);
     document.getElementById('btnRun').addEventListener('click', toggleRun);
     document.getElementById('btnFastForward').addEventListener('click', fastForward);
+    document.getElementById('strategySelect').addEventListener('change', () => {
+        updateDimLimits();
+        reset();
+    });
     document.getElementById('dimInput').addEventListener('change', (e) => {
-        GRID_DIM = parseInt(e.target.value);
+        let val = parseInt(e.target.value);
+        if (val < 2) val = 2;
+
+        const strategy = document.getElementById('strategySelect').value;
+        const max = strategy === 'delta' ? 200 : 100;
+
+        if (val > max) val = max;
+        e.target.value = val;
+        GRID_DIM = val;
         reset();
     });
     document.getElementById('speedSlider').addEventListener('input', (e) => {
@@ -93,8 +105,27 @@ window.onload = async () => {
     // Initialize UI-only tile list for Legend/GodMode
     initTilesUI();
 
+    updateDimLimits();
     reset();
 };
+
+function updateDimLimits() {
+    const strategy = document.getElementById('strategySelect').value;
+    const dimInput = document.getElementById('dimInput');
+
+    if (strategy === 'delta') {
+        dimInput.max = 200;
+        // If current value is > 200, clamp it? No, only clamp if user changes it or we want to be strict.
+        // But if switching FROM snapshot TO delta, we are fine.
+        // If switching FROM delta TO snapshot, we might need to clamp if it's too high.
+    } else {
+        dimInput.max = 100;
+        if (parseInt(dimInput.value) > 100) {
+            dimInput.value = 100;
+            GRID_DIM = 100;
+        }
+    }
+}
 
 function initWorker() {
     worker = new Worker('./js/worker.js', { type: 'module' });
