@@ -1,4 +1,5 @@
 import { Tile } from './tile.js';
+import { SnapshotStrategy, DeltaStrategy } from './history.js';
 
 class MinHeap {
     constructor() {
@@ -91,12 +92,18 @@ export class Cell {
 }
 
 export class WFCModel {
-    constructor(size, tiles) {
+    constructor(size, tiles, strategy = "snapshot") {
         this.size = size;
         this.tiles = tiles; // All possible tiles
         this.grid = [];
         this.propStack = []; // For propagation
-        this.stack = [];     // For backtracking history
+
+        if (strategy === "delta") {
+            this.strategy = new DeltaStrategy(this);
+        } else {
+            this.strategy = new SnapshotStrategy(this);
+        }
+
         this.status = "READY"; // READY, RUNNING, COMPLETED, FAILED
         this.heap = new MinHeap();
 
@@ -116,7 +123,7 @@ export class WFCModel {
             });
         }
         this.propStack = [];
-        this.stack = [];
+        this.strategy.clear();
         this.status = "READY";
     }
 
@@ -126,6 +133,32 @@ export class WFCModel {
             cloned.collapsed = cell.collapsed;
             return cloned;
         });
+    }
+
+    rebuildHeap() {
+        this.heap = new MinHeap();
+        for (let i = 0; i < this.grid.length; i++) {
+            if (!this.grid[i].collapsed) {
+                this.heap.push({
+                    index: i,
+                    entropy: this.grid[i].entropy() + Math.random() * 0.0001,
+                    optionsCount: this.grid[i].options.length
+                });
+            }
+        }
+    }
+
+    // Helper to remove an option and track it via strategy
+    removeOption(index, tile) {
+        const cell = this.grid[index];
+        const prevLen = cell.options.length;
+        cell.options = cell.options.filter(o => o !== tile);
+
+        if (cell.options.length < prevLen) {
+            if (this.strategy.onOptionRemoved) {
+                this.strategy.onOptionRemoved(index, tile);
+            }
+        }
     }
 
     // Main iteration step
@@ -153,15 +186,18 @@ export class WFCModel {
         const choice = cell.options[choiceIndex];
 
         // 3. Save state for backtracking BEFORE change
-        // We store the grid state and what we are about to try
-        this.stack.push({
-            grid: this.cloneGrid(),
-            cellIndex: cellIndex,
-            choice: choice
-        });
+        this.strategy.save(cellIndex, choice);
 
         cell.collapsed = true;
-        cell.options = [choice];
+
+        // Remove all other options using removeOption
+        // Iterate backwards or use a copy since we are modifying the array we are iterating over?
+        // Actually cell.options is modified by removeOption.
+        // It's safer to create a list of tiles to remove first.
+        const toRemove = cell.options.filter(o => o !== choice);
+        for (const t of toRemove) {
+            this.removeOption(cellIndex, t);
+        }
 
         // 4. Propagate constraints
         this.propStack.push(cellIndex);
@@ -173,29 +209,18 @@ export class WFCModel {
     }
 
     backtrack() {
-        if (this.stack.length === 0) {
+        const lastState = this.strategy.undo();
+
+        if (!lastState) {
             this.status = "FAILED";
             return false;
         }
 
-        const lastState = this.stack.pop();
-        this.grid = lastState.grid;
-
         const cell = this.grid[lastState.cellIndex];
-        // Remove the option that failed
-        cell.options = cell.options.filter(o => o !== lastState.choice);
 
-        // Rebuild heap because grid state was restored
-        this.heap = new MinHeap();
-        for (let i = 0; i < this.grid.length; i++) {
-            if (!this.grid[i].collapsed) {
-                this.heap.push({
-                    index: i,
-                    entropy: this.grid[i].entropy() + Math.random() * 0.0001,
-                    optionsCount: this.grid[i].options.length
-                });
-            }
-        }
+        // Remove the option that failed using removeOption
+        // (This ensures DeltaStrategy records this removal in the *previous* frame or current frame context)
+        this.removeOption(lastState.cellIndex, lastState.choice);
 
         if (cell.options.length === 0) {
             // This state itself is now invalid, backtrack further
@@ -203,11 +228,6 @@ export class WFCModel {
         }
 
         // Re-propagate from this cell since we removed an option from it
-        // This is necessary because the grid we restored might have been
-        // partially propagated before the failed choice.
-        // Actually, lastState.grid is the state BEFORE we collapsed cellIndex.
-        // So we just need to re-propagate to ensure the removal of 'choice'
-        // from 'cell.options' is felt by neighbors.
         this.propStack.push(lastState.cellIndex);
         if (!this.propagate()) {
             return this.backtrack();
@@ -227,7 +247,7 @@ export class WFCModel {
                 return -2; // Contradiction
             }
 
-            // Stale check: if the number of options in the heap doesn't match the current number of options
+            // Stale check
             if (node.optionsCount !== cell.options.length) {
                 continue;
             }
@@ -257,10 +277,10 @@ export class WFCModel {
 
             // Directions: 0:N, 1:E, 2:S, 3:W
             const dirs = [
-                { dx: 0, dy: -1, opp: 2, socketIdx: 0 }, // North (connects to neighbor's South)
-                { dx: 1, dy: 0, opp: 3, socketIdx: 1 },  // East  (connects to neighbor's West)
-                { dx: 0, dy: 1, opp: 0, socketIdx: 2 },  // South (connects to neighbor's North)
-                { dx: -1, dy: 0, opp: 1, socketIdx: 3 }  // West  (connects to neighbor's East)
+                { dx: 0, dy: -1, opp: 2, socketIdx: 0 }, // North
+                { dx: 1, dy: 0, opp: 3, socketIdx: 1 },  // East
+                { dx: 0, dy: 1, opp: 0, socketIdx: 2 },  // South
+                { dx: -1, dy: 0, opp: 1, socketIdx: 3 }  // West
             ];
 
             for (let d of dirs) {
@@ -271,18 +291,26 @@ export class WFCModel {
                     const neighborIdx = ny * this.size + nx;
                     const neighbor = this.grid[neighborIdx];
 
-                    // Calculate valid options for neighbor based on current cell's remaining options
                     const validSockets = new Set();
                     for (let tile of curCell.options) {
                         validSockets.add(tile.sockets[d.socketIdx]);
                     }
 
-                    // Filter neighbor options
                     const originalCount = neighbor.options.length;
-                    neighbor.options = neighbor.options.filter(neighborTile => {
+
+                    // Identify tiles to remove
+                    const toRemove = [];
+                    for (const neighborTile of neighbor.options) {
                         const neighborSocket = neighborTile.sockets[d.opp];
-                        return validSockets.has(neighborSocket);
-                    });
+                        if (!validSockets.has(neighborSocket)) {
+                            toRemove.push(neighborTile);
+                        }
+                    }
+
+                    // Remove them using the strategy-aware method
+                    for (const t of toRemove) {
+                        this.removeOption(neighborIdx, t);
+                    }
 
                     if (neighbor.options.length === 0) {
                         this.propStack = []; // Clear stack on failure
