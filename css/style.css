@@ -137,6 +137,41 @@ input[type="range"] {
     height: 18px;
 }
 
+hr {
+    border: 0;
+    border-top: 1px solid #444;
+    margin: 10px 0;
+}
+
+.control-section {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.control-section h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--accent-color);
+}
+
+.weight-val {
+    min-width: 25px;
+    text-align: right;
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: #bbb;
+}
+
+.secondary-btn {
+    background-color: #5c6bc0;
+}
+
+.secondary-btn:hover {
+    background-color: #3f51b5;
+}
+
 .status-panel p {
     margin: 5px 0;
     font-size: 0.9rem;

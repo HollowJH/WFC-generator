@@ -1,6 +1,5 @@
 import { createSimpleTiles } from './tile.js';
-import { WFCModel } from './wfc.js';
-import { loadImages } from './assets.js';
+import { images, loadImages } from './assets.js';
 
 // --- Configuration ---
 const CANVAS_SIZE = 600;
@@ -8,7 +7,11 @@ let GRID_DIM = 10;
 let FPS = 30; // Speed of auto-run
 
 // --- State ---
-let model;
+let worker;
+let grid = [];
+let status = "READY";
+let stackDepth = 0;
+let remaining = 0;
 let canvas, ctx;
 let isRunning = false;
 let autoRunId = null;
@@ -27,6 +30,7 @@ window.onload = async () => {
     document.getElementById('btnReset').addEventListener('click', reset);
     document.getElementById('btnStep').addEventListener('click', step);
     document.getElementById('btnRun').addEventListener('click', toggleRun);
+    document.getElementById('btnFastForward').addEventListener('click', fastForward);
     document.getElementById('dimInput').addEventListener('change', (e) => {
         GRID_DIM = parseInt(e.target.value);
         reset();
@@ -43,6 +47,18 @@ window.onload = async () => {
     // Portfolio Features
     document.getElementById('btnSaveImg').addEventListener('click', saveImage);
     document.getElementById('btnExport').addEventListener('click', exportJSON);
+
+    // Biome Weights
+    document.getElementById('waterWeight').addEventListener('input', (e) => {
+        document.getElementById('waterWeightVal').textContent = e.target.value;
+    });
+    document.getElementById('landWeight').addEventListener('input', (e) => {
+        document.getElementById('landWeightVal').textContent = e.target.value;
+    });
+    document.getElementById('mountainWeight').addEventListener('input', (e) => {
+        document.getElementById('mountainWeightVal').textContent = e.target.value;
+    });
+    document.getElementById('btnApplyWeights').addEventListener('click', reset);
 
     // God Mode
     canvas.addEventListener('click', handleCanvasClick);
@@ -71,38 +87,40 @@ window.onload = async () => {
         overlay.classList.add('hidden');
     }
 
-    // Initialize
-    initTiles(); // Create tiles + rotations
+    // Initialize Worker
+    initWorker();
+
+    // Initialize UI-only tile list for Legend/GodMode
+    initTilesUI();
+
     reset();
 };
 
-let allTiles = [];
+function initWorker() {
+    worker = new Worker('./js/worker.js', { type: 'module' });
 
-function initTiles() {
-    const baseTiles = createSimpleTiles();
-    allTiles = [];
+    worker.onmessage = function(e) {
+        const { type, payload } = e.data;
+        if (type === 'UPDATE') {
+            grid = payload.grid;
+            status = payload.status;
+            stackDepth = payload.stackDepth;
+            remaining = payload.remaining;
 
-    // Generate rotations for better connectivity
-    baseTiles.forEach(t => {
-        allTiles.push(t);
-        // Add 90, 180, 270 degree rotations
-        for (let i = 1; i <= 3; i++) {
-            const rot = t.rotate(i);
+            draw();
+            updateStatus();
 
-            // Optimization: Don't add if identical to existing (e.g. Sea rotated is still Sea)
-            // Checking equality of sockets is O(1) here (4 strings)
-            const isDuplicate = allTiles.some(existing =>
-                existing.sockets[0] === rot.sockets[0] &&
-                existing.sockets[1] === rot.sockets[1] &&
-                existing.sockets[2] === rot.sockets[2] &&
-                existing.sockets[3] === rot.sockets[3]
-            );
-
-            if (!isDuplicate) {
-                allTiles.push(rot);
+            if (!payload.changed || status === "COMPLETED" || status === "FAILED") {
+                stopAutoRun();
             }
         }
-    });
+    };
+}
+
+let baseTiles = [];
+
+function initTilesUI() {
+    baseTiles = createSimpleTiles();
 
     // Render Legend
     const legendDiv = document.getElementById('tileLegend');
@@ -115,9 +133,9 @@ function initTiles() {
         const imgContainer = document.createElement('div');
         imgContainer.className = 'legend-img-container';
 
-        if (t.image) {
+        if (t.imageKey && images[t.imageKey]) {
             const img = document.createElement('img');
-            img.src = t.image.src; // Use the image source
+            img.src = images[t.imageKey].src;
             img.className = 'legend-tile-img';
             imgContainer.appendChild(img);
         } else {
@@ -136,24 +154,32 @@ function initTiles() {
 function reset() {
     stopAutoRun();
 
-    // Re-create model
-    // We pass ALL generated tiles (including rotations)
-    model = new WFCModel(GRID_DIM, allTiles);
+    const weights = {
+        water: parseInt(document.getElementById('waterWeight').value),
+        land: parseInt(document.getElementById('landWeight').value),
+        mountain: parseInt(document.getElementById('mountainWeight').value),
+        forest: 6 // Default for now as no slider requested
+    };
 
-    updateStatus();
-    draw();
+    worker.postMessage({
+        type: 'INIT',
+        payload: {
+            gridDim: GRID_DIM,
+            weights: weights
+        }
+    });
 }
 
 function step() {
-    if (!model) return;
+    const stepsPerFrame = FPS > 60 ? Math.ceil(FPS / 60) : 1;
+    worker.postMessage({ type: 'STEP', payload: { count: stepsPerFrame } });
+}
 
-    const changed = model.step();
-    draw();
-    updateStatus();
-
-    if (!changed || model.status === "COMPLETED" || model.status === "FAILED") {
-        stopAutoRun();
+function fastForward() {
+    if (status === "COMPLETED" || status === "FAILED") {
+        reset();
     }
+    worker.postMessage({ type: 'RUN_UNTIL_DONE' });
 }
 
 function toggleRun() {
@@ -165,7 +191,7 @@ function toggleRun() {
 }
 
 function startAutoRun() {
-    if (model.status === "COMPLETED" || model.status === "FAILED") {
+    if (status === "COMPLETED" || status === "FAILED") {
         reset(); // Auto reset if finished
     }
 
@@ -176,7 +202,8 @@ function startAutoRun() {
     function loop(timestamp) {
         if (!isRunning) return;
 
-        const fpsInterval = 1000 / FPS;
+        const effectiveFPS = Math.min(FPS, 60);
+        const fpsInterval = 1000 / effectiveFPS;
         const elapsed = timestamp - lastTime;
 
         if (elapsed > fpsInterval) {
@@ -197,15 +224,14 @@ function stopAutoRun() {
 
 function updateStatus() {
     const statusEl = document.getElementById('statusText');
-    statusEl.textContent = model.status;
-    statusEl.style.color = model.status === "FAILED" ? "red" : (model.status === "COMPLETED" ? "#4caf50" : "white");
+    statusEl.textContent = status;
+    statusEl.style.color = status === "FAILED" ? "red" : (status === "COMPLETED" ? "#4caf50" : "white");
 
     // Count remaining uncollapsed cells
-    const remaining = model.grid.filter(c => !c.collapsed).length;
     document.getElementById('remainingText').textContent = remaining;
 
     // Update stack depth
-    document.getElementById('stackDepthText').textContent = model.stack ? model.stack.length : 0;
+    document.getElementById('stackDepthText').textContent = stackDepth;
 }
 
 // --- Portfolio Features (Tools Programming) ---
@@ -218,7 +244,7 @@ function saveImage() {
 }
 
 function exportJSON() {
-    if (model.status !== "COMPLETED") {
+    if (status !== "COMPLETED") {
         alert("Please wait for generation to complete before exporting.");
         return;
     }
@@ -227,7 +253,7 @@ function exportJSON() {
     const mapData = {
         width: GRID_DIM,
         height: GRID_DIM,
-        tiles: model.grid.map(cell => cell.options[0].name)
+        tiles: grid.map(cell => cell.options[0].name)
     };
 
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mapData, null, 2));
@@ -243,19 +269,21 @@ function draw() {
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
+    if (grid.length === 0) return;
+
     const cellSize = CANVAS_SIZE / GRID_DIM;
 
-    // Pre-calculate max entropy for normalization
-    // Shannon entropy max is log(N) where N is number of choices (if weights are equal)
-    const maxH = Math.log(allTiles.length);
+    // Approximate max entropy for normalization
+    const maxH = 4; // log(60ish)
 
-    for (let i = 0; i < model.grid.length; i++) {
-        const cell = model.grid[i];
+    for (let i = 0; i < grid.length; i++) {
+        const cell = grid[i];
         const x = (i % GRID_DIM) * cellSize;
         const y = Math.floor(i / GRID_DIM) * cellSize;
 
         if (showEntropy) {
-            const h = cell.entropy();
+            // Re-calculate entropy locally for visualization
+            const h = calculateEntropy(cell.options);
             const ratio = Math.min(1, h / maxH);
             const val = Math.floor(ratio * 255);
             ctx.fillStyle = `rgb(${val}, ${val}, ${val})`;
@@ -325,12 +353,24 @@ function draw() {
     }
 }
 
+function calculateEntropy(options) {
+    if (options.length <= 1) return 0;
+    let sumWeights = 0;
+    let sumWeightLogWeight = 0;
+    for (const tile of options) {
+        sumWeights += tile.weight;
+        sumWeightLogWeight += tile.weight * Math.log(tile.weight);
+    }
+    if (sumWeights === 0) return 0;
+    return Math.log(sumWeights) - (sumWeightLogWeight / sumWeights);
+}
+
 function drawTile(tile, x, y, size) {
-    if (tile.image) {
+    if (tile.imageKey && images[tile.imageKey]) {
         ctx.save();
         ctx.translate(x + size / 2, y + size / 2);
         ctx.rotate((tile.rotation * 90 * Math.PI) / 180);
-        ctx.drawImage(tile.image, -size / 2, -size / 2, size, size);
+        ctx.drawImage(images[tile.imageKey], -size / 2, -size / 2, size, size);
         ctx.restore();
     } else {
         ctx.fillStyle = tile.color || "#f0f";
@@ -361,7 +401,9 @@ function handleCanvasClick(e) {
 
 function showGodModeOverlay(index) {
     selectedCellIndex = index;
-    const cell = model.grid[index];
+    const cell = grid[index];
+    if (!cell) return;
+
     const overlay = document.getElementById('godModeOverlay');
     const optionsDiv = document.getElementById('tileOptions');
 
@@ -380,10 +422,10 @@ function showGodModeOverlay(index) {
         tempCanvas.height = 64;
         const tempCtx = tempCanvas.getContext('2d');
 
-        if (tile.image) {
+        if (tile.imageKey && images[tile.imageKey]) {
             tempCtx.translate(32, 32);
             tempCtx.rotate((tile.rotation * 90 * Math.PI) / 180);
-            tempCtx.drawImage(tile.image, -32, -32, 64, 64);
+            tempCtx.drawImage(images[tile.imageKey], -32, -32, 64, 64);
         } else {
             tempCtx.fillStyle = tile.color || "#f0f";
             tempCtx.fillRect(0, 0, 64, 64);
@@ -413,30 +455,15 @@ function hideGodModeOverlay() {
 function selectTile(tile) {
     if (selectedCellIndex === -1) return;
 
-    const cell = model.grid[selectedCellIndex];
-
-    // God Mode History: Push to stack before changing
-    model.stack.push({
-        grid: model.cloneGrid(),
-        cellIndex: selectedCellIndex,
-        choice: tile
+    worker.postMessage({
+        type: 'COLLAPSE',
+        payload: {
+            index: selectedCellIndex,
+            tileName: tile.name,
+            rotation: tile.rotation
+        }
     });
 
-    // Manual collapse
-    cell.collapsed = true;
-    cell.options = [tile];
-
-    // Propagate
-    model.propStack.push(selectedCellIndex);
-    const success = model.propagate();
-
-    if (!success) {
-        // If manual choice is impossible, backtrack immediately
-        model.backtrack();
-    }
-
-    draw();
-    updateStatus();
     hideGodModeOverlay();
 }
 

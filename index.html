@@ -38,7 +38,7 @@
 
                 <div class="control-group">
                     <label>Speed (FPS):</label>
-                    <input type="range" id="speedSlider" min="1" max="60" value="30">
+                    <input type="range" id="speedSlider" min="1" max="1200" value="30">
                 </div>
 
                 <div class="control-group">
@@ -52,11 +52,33 @@
                     <button id="btnReset">Reset</button>
                     <button id="btnStep">Step</button>
                     <button id="btnRun">Auto Run</button>
+                    <button id="btnFastForward">Finish Instantly</button>
                 </div>
 
                 <div class="button-group">
                     <button id="btnSaveImg">Save Image</button>
                     <button id="btnExport">Export JSON</button>
+                </div>
+
+                <hr>
+                <div class="control-section">
+                    <h3>Biome Weights</h3>
+                    <div class="control-group">
+                        <label>Water</label>
+                        <input type="range" id="waterWeight" min="1" max="50" value="5">
+                        <span class="weight-val" id="waterWeightVal">5</span>
+                    </div>
+                    <div class="control-group">
+                        <label>Land</label>
+                        <input type="range" id="landWeight" min="1" max="50" value="20">
+                        <span class="weight-val" id="landWeightVal">20</span>
+                    </div>
+                    <div class="control-group">
+                        <label>Mountain</label>
+                        <input type="range" id="mountainWeight" min="1" max="20" value="3">
+                        <span class="weight-val" id="mountainWeightVal">3</span>
+                    </div>
+                    <button id="btnApplyWeights" class="secondary-btn">Apply & Restart</button>
                 </div>
 
                 <div class="status-panel">
