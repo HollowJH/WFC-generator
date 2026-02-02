@@ -2,69 +2,132 @@ import { Tile } from './tile.js';
 import { SnapshotStrategy, DeltaStrategy } from './history.js';
 
 class MinHeap {
-    constructor() {
-        this.heap = [];
+    constructor(maxSize) {
+        this.maxSize = maxSize;
+        this.heapSize = 0;
+        // Structure of Arrays (SoA) for memory efficiency
+        this.indices = new Int32Array(maxSize);
+        this.entropies = new Float64Array(maxSize);
+        this.optionCounts = new Int32Array(maxSize);
     }
 
-    push(node) {
-        this.heap.push(node);
+    push(index, entropy, optionsCount) {
+        if (this.heapSize >= this.maxSize) {
+            // Should not happen given we allocate for grid size * buffer,
+            // but for lazy deletion we might exceed grid size.
+            // In that case, we might need to resize.
+            // For now, let's assume strict bounds or handle resize if needed.
+            // Actually, with lazy deletion, heap size can be > grid size.
+            this.resize();
+        }
+
+        const i = this.heapSize;
+        this.indices[i] = index;
+        this.entropies[i] = entropy;
+        this.optionCounts[i] = optionsCount;
+        this.heapSize++;
         this.bubbleUp();
     }
 
     pop() {
-        if (this.size === 0) return null;
-        const min = this.heap[0];
-        const last = this.heap.pop();
-        if (this.size > 0) {
-            this.heap[0] = last;
+        if (this.heapSize === 0) return null;
+
+        // Return object for consumption (ephemeral, easy for GC)
+        const result = {
+            index: this.indices[0],
+            entropy: this.entropies[0],
+            optionsCount: this.optionCounts[0]
+        };
+
+        this.heapSize--;
+        if (this.heapSize > 0) {
+            // Move last to first
+            this.indices[0] = this.indices[this.heapSize];
+            this.entropies[0] = this.entropies[this.heapSize];
+            this.optionCounts[0] = this.optionCounts[this.heapSize];
             this.sinkDown();
         }
-        return min;
+
+        return result;
     }
 
     get size() {
-        return this.heap.length;
+        return this.heapSize;
+    }
+
+    clear() {
+        this.heapSize = 0;
+    }
+
+    resize() {
+        const newSize = this.maxSize * 2;
+        const newIndices = new Int32Array(newSize);
+        const newEntropies = new Float64Array(newSize);
+        const newOptionCounts = new Int32Array(newSize);
+
+        newIndices.set(this.indices);
+        newEntropies.set(this.entropies);
+        newOptionCounts.set(this.optionCounts);
+
+        this.indices = newIndices;
+        this.entropies = newEntropies;
+        this.optionCounts = newOptionCounts;
+        this.maxSize = newSize;
     }
 
     bubbleUp() {
-        let index = this.heap.length - 1;
+        let index = this.heapSize - 1;
         while (index > 0) {
             let parentIndex = Math.floor((index - 1) / 2);
-            if (this.heap[parentIndex].entropy <= this.heap[index].entropy) break;
-            [this.heap[parentIndex], this.heap[index]] = [this.heap[index], this.heap[parentIndex]];
+            if (this.entropies[parentIndex] <= this.entropies[index]) break;
+            this.swap(index, parentIndex);
             index = parentIndex;
         }
     }
 
     sinkDown() {
         let index = 0;
-        const length = this.heap.length;
+        const length = this.heapSize;
         while (true) {
             let leftChildIndex = 2 * index + 1;
             let rightChildIndex = 2 * index + 2;
             let swap = null;
 
             if (leftChildIndex < length) {
-                if (this.heap[leftChildIndex].entropy < this.heap[index].entropy) {
+                if (this.entropies[leftChildIndex] < this.entropies[index]) {
                     swap = leftChildIndex;
                 }
             }
 
             if (rightChildIndex < length) {
                 if (
-                    (swap === null && this.heap[rightChildIndex].entropy < this.heap[index].entropy) ||
-                    (swap !== null && this.heap[rightChildIndex].entropy < this.heap[leftChildIndex].entropy)
+                    (swap === null && this.entropies[rightChildIndex] < this.entropies[index]) ||
+                    (swap !== null && this.entropies[rightChildIndex] < this.entropies[leftChildIndex])
                 ) {
-                    if (this.heap[rightChildIndex].entropy < this.heap[leftChildIndex].entropy) {
+                    if (this.entropies[rightChildIndex] < this.entropies[leftChildIndex]) {
                         swap = rightChildIndex;
                     }
                 }
             }
 
             if (swap === null) break;
-            [this.heap[index], this.heap[swap]] = [this.heap[swap], this.heap[index]];
+            this.swap(index, swap);
             index = swap;
         }
+    }
+
+    swap(i, j) {
+        const tempIdx = this.indices[i];
+        const tempEnt = this.entropies[i];
+        const tempCnt = this.optionCounts[i];
+
+        this.indices[i] = this.indices[j];
+        this.entropies[i] = this.entropies[j];
+        this.optionCounts[i] = this.optionCounts[j];
+
+        this.indices[j] = tempIdx;
+        this.entropies[j] = tempEnt;
+        this.optionCounts[j] = tempCnt;
     }
 }
 
@@ -92,9 +155,10 @@ export class Cell {
 }
 
 export class WFCModel {
-    constructor(size, tiles, strategy = "snapshot") {
+    constructor(size, tiles, strategy = "snapshot", useHeuristic = false) {
         this.size = size;
         this.tiles = tiles; // All possible tiles
+        this.useHeuristic = useHeuristic;
         this.grid = [];
         this.propStack = []; // For propagation
 
@@ -115,7 +179,8 @@ export class WFCModel {
         }
 
         this.status = "READY"; // READY, RUNNING, COMPLETED, FAILED
-        this.heap = new MinHeap();
+        // Initial capacity estimation: grid size * 10 (generous buffer for lazy deletion)
+        this.heap = new MinHeap(this.size * this.size * 10);
 
         this.initialize();
     }
@@ -142,9 +207,53 @@ export class WFCModel {
         }
     }
 
+    // Helper to calculate priority (Entropy + Heuristic)
+    getPriority(index) {
+        const cell = this.grid[index];
+        let priority = cell.entropy() + Math.random() * 0.001; // Small random noise
+
+        if (this.useHeuristic) {
+            // Degree Heuristic: Count uncollapsed neighbors
+            // We want to prioritize cells with MORE uncollapsed neighbors (Most Constraining)
+            // or maybe neighbors that are already collapsed?
+            // Standard Degree heuristic: "variable involved in the largest number of constraints on other UNASSIGNED variables".
+            // So we count UNCOLLAPSED neighbors.
+            // Higher degree -> Collapsing this affects more future decisions -> Do it earlier.
+            // MinHeap pops smallest value. So we subtract degree.
+            const degree = this.getUncollapsedDegree(index);
+            priority -= degree * 0.1; // Weight degree as a strong tie-breaker
+        }
+        return priority;
+    }
+
+    getUncollapsedDegree(index) {
+        let count = 0;
+        const curX = index % this.size;
+        const curY = Math.floor(index / this.size);
+
+        const dirs = [
+            { dx: 0, dy: -1 },
+            { dx: 1, dy: 0 },
+            { dx: 0, dy: 1 },
+            { dx: -1, dy: 0 }
+        ];
+
+        for (let d = 0; d < 4; d++) {
+            const nx = curX + dirs[d].dx;
+            const ny = curY + dirs[d].dy;
+            if (nx >= 0 && nx < this.size && ny >= 0 && ny < this.size) {
+                const nIdx = ny * this.size + nx;
+                if (!this.grid[nIdx].collapsed) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     initialize() {
         this.grid = [];
-        this.heap = new MinHeap();
+        this.heap.clear();
 
         // AC-4: Initialize supports
         // Flattened 3D array: [cellIndex][tileId][dir]
@@ -154,11 +263,17 @@ export class WFCModel {
         for (let i = 0; i < this.size * this.size; i++) {
             const cell = new Cell(this.tiles);
             this.grid.push(cell);
-            this.heap.push({
-                index: i,
-                entropy: cell.entropy() + Math.random() * 0.0001,
-                optionsCount: cell.options.length
-            });
+            // We delay pushing to heap until getPriority is safe to call (grid populated)
+        }
+
+        // Now push to heap with correct priorities
+        for (let i = 0; i < this.size * this.size; i++) {
+            const cell = this.grid[i];
+            this.heap.push(
+                i,
+                this.getPriority(i),
+                cell.options.length
+            );
         }
 
         this.initSupports();
@@ -252,14 +367,14 @@ export class WFCModel {
     }
 
     rebuildHeap() {
-        this.heap = new MinHeap();
+        this.heap.clear();
         for (let i = 0; i < this.grid.length; i++) {
             if (!this.grid[i].collapsed) {
-                this.heap.push({
-                    index: i,
-                    entropy: this.grid[i].entropy() + Math.random() * 0.0001,
-                    optionsCount: this.grid[i].options.length
-                });
+                this.heap.push(
+                    i,
+                    this.getPriority(i),
+                    this.grid[i].options.length
+                );
             }
         }
     }
@@ -267,21 +382,26 @@ export class WFCModel {
     // Helper to remove an option and track it via strategy
     removeOption(index, tile) {
         const cell = this.grid[index];
-        // Check if already removed (optimization)
-        if (!cell.options.includes(tile)) return;
 
-        const prevLen = cell.options.length;
-        cell.options = cell.options.filter(o => o !== tile);
+        // Find index of tile to remove
+        const optIdx = cell.options.indexOf(tile);
+        if (optIdx === -1) return;
 
-        if (cell.options.length < prevLen) {
-            // Notify strategy (for Delta undo)
-            if (this.strategy.onOptionRemoved) {
-                this.strategy.onOptionRemoved(index, tile);
-            }
+        // Swap with last and pop to avoid array allocation (slower splice or filter)
+        // Order of options doesn't matter
+        const last = cell.options[cell.options.length - 1];
+        cell.options[optIdx] = last;
+        cell.options.pop();
 
-            // AC-4: Add to propagation stack
-            this.propStack.push({ index, tile });
+        // Notify strategy (for Delta undo)
+        if (this.strategy.onOptionRemoved) {
+            this.strategy.onOptionRemoved(index, tile);
         }
+
+        // AC-4: Add to propagation stack
+        // Optimization: Push separate values to flat array instead of allocating {index, tile} object
+        this.propStack.push(index);
+        this.propStack.push(tile);
     }
 
     // Hook called by DeltaStrategy during undo
@@ -422,7 +542,10 @@ export class WFCModel {
 
     propagate() {
         while (this.propStack.length > 0) {
-            const { index: currentIdx, tile: removedTile } = this.propStack.pop();
+            // Optimization: Pop individual values from flat stack
+            const removedTile = this.propStack.pop();
+            const currentIdx = this.propStack.pop();
+
             const curX = currentIdx % this.size;
             const curY = Math.floor(currentIdx / this.size);
 
@@ -478,11 +601,11 @@ export class WFCModel {
                                 // Update heap if entropy changed
                                 // We can just push to heap, lazy deletion handles duplicates
                                 if (neighbor.options.length < originalCount) {
-                                    this.heap.push({
-                                        index: neighborIdx,
-                                        entropy: neighbor.entropy() + Math.random() * 0.0001,
-                                        optionsCount: neighbor.options.length
-                                    });
+                                    this.heap.push(
+                                        neighborIdx,
+                                        this.getPriority(neighborIdx),
+                                        neighbor.options.length
+                                    );
                                 }
                             }
                         }

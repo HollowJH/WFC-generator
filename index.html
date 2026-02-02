@@ -25,12 +25,6 @@
     </div>
 
     <div class="container">
-        <nav class="portfolio-nav">
-            <a href="index.html" class="active">Wave Function Collapse</a>
-            <a href="physics_engine/index.html">Verlet Physics</a>
-            <a href="spatial_partitioning/index.html">Spatial Partitioning</a>
-        </nav>
-
         <header>
             <h1>Wave Function Collapse</h1>
             <p>Simple Tiled Model Visualization</p>
@@ -67,11 +61,18 @@
                     </label>
                 </div>
 
+                <div class="control-group">
+                    <label class="toggle-control">
+                        <input type="checkbox" id="chkHeuristic" checked>
+                        <span>Use Heuristics</span>
+                    </label>
+                </div>
+
                 <div class="button-group">
                     <button id="btnReset">Reset</button>
                     <button id="btnStep">Step</button>
                     <button id="btnRun">Auto Run</button>
-                    <button id="btnFastForward">Finish Instantly</button>
+                    <button id="btnFastForward">Skip animation</button>
                 </div>
 
                 <div class="button-group">

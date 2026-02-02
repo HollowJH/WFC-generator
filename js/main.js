@@ -56,6 +56,8 @@ window.onload = async () => {
         draw();
     });
 
+    document.getElementById('chkHeuristic').addEventListener('change', reset);
+
     // Portfolio Features
     document.getElementById('btnSaveImg').addEventListener('click', saveImage);
     document.getElementById('btnExport').addEventListener('click', exportJSON);
@@ -141,8 +143,20 @@ function initWorker() {
             stackDepth = payload.stackDepth;
             remaining = payload.remaining;
 
-            // Hide loading on first update
-            hideLoading();
+            // Only hide loading if we are truly done or ready
+            // If status is RUNNING, it means we are in the middle of "Skip Animation"
+            if (status !== "RUNNING") {
+                hideLoading();
+            } else {
+                // If running and overlay is visible, update its text
+                const overlay = document.getElementById('processingOverlay');
+                if (overlay && !overlay.classList.contains('hidden')) {
+                    const txt = document.getElementById('processingText');
+                    if (txt) {
+                        txt.textContent = `Processing... (${remaining} left)`;
+                    }
+                }
+            }
 
             draw();
             updateStatus();
@@ -209,7 +223,8 @@ function reset() {
         payload: {
             gridDim: GRID_DIM,
             weights: weights,
-            strategy: document.getElementById('strategySelect').value
+            strategy: document.getElementById('strategySelect').value,
+            useHeuristic: document.getElementById('chkHeuristic').checked
         }
     });
 }
@@ -225,7 +240,7 @@ function fastForward() {
         return;
     }
 
-    showLoading("Fast Forwarding...");
+    showLoading("Skipping animation...");
 
     // Allow UI to update before sending message
     requestAnimationFrame(() => {

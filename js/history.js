@@ -44,14 +44,15 @@ export class DeltaStrategy extends HistoryStrategy {
         this.currentFrame = {
             cellIndex: cellIndex,
             choice: choice,
-            removed: [] // Stores {index, tile}
+            removed: [] // Flat array: [index1, tile1, index2, tile2...]
         };
         this.stack.push(this.currentFrame);
     }
 
     onOptionRemoved(index, tile) {
         if (this.currentFrame) {
-            this.currentFrame.removed.push({ index, tile });
+            this.currentFrame.removed.push(index);
+            this.currentFrame.removed.push(tile);
         }
     }
 
@@ -60,8 +61,11 @@ export class DeltaStrategy extends HistoryStrategy {
         const frame = this.stack.pop();
 
         // 1. Restore removed options (reverse order)
-        for (let i = frame.removed.length - 1; i >= 0; i--) {
-            const { index, tile } = frame.removed[i];
+        // Since it's a flat array [i1, t1, i2, t2], we iterate by 2 backwards
+        for (let i = frame.removed.length - 2; i >= 0; i -= 2) {
+            const index = frame.removed[i];
+            const tile = frame.removed[i + 1];
+
             this.model.grid[index].options.push(tile);
 
             // AC-4: Increment supports for restored tile
