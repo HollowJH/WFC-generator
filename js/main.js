@@ -128,6 +128,9 @@ function updateDimLimits() {
 }
 
 function initWorker() {
+    if (worker) {
+        worker.terminate();
+    }
     worker = new Worker('./js/worker.js', { type: 'module' });
 
     worker.onmessage = function(e) {
@@ -137,6 +140,9 @@ function initWorker() {
             status = payload.status;
             stackDepth = payload.stackDepth;
             remaining = payload.remaining;
+
+            // Hide loading on first update
+            hideLoading();
 
             draw();
             updateStatus();
@@ -184,6 +190,12 @@ function initTilesUI() {
 
 function reset() {
     stopAutoRun();
+
+    // Show loading immediately
+    showLoading();
+
+    // Re-create worker (Hard Stop)
+    initWorker();
 
     const weights = {
         water: parseInt(document.getElementById('waterWeight').value),
@@ -267,6 +279,22 @@ function updateStatus() {
 }
 
 // --- Portfolio Features (Tools Programming) ---
+
+function showLoading(text = "Processing...") {
+    const overlay = document.getElementById('processingOverlay');
+    const txt = document.getElementById('processingText');
+    if (overlay && txt) {
+        txt.textContent = text;
+        overlay.classList.remove('hidden');
+    }
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('processingOverlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+    }
+}
 
 function saveImage() {
     const link = document.createElement('a');
