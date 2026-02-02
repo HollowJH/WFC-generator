@@ -26,6 +26,10 @@ export class SnapshotStrategy extends HistoryStrategy {
         // Rebuild heap since grid was fully replaced
         this.model.rebuildHeap();
 
+        // AC-4: Rebuild supports since grid changed
+        // This is expensive but necessary for snapshot strategy
+        this.model.initSupports();
+
         return lastState; // Return { cellIndex, choice } for banning
     }
 }
@@ -59,6 +63,9 @@ export class DeltaStrategy extends HistoryStrategy {
         for (let i = frame.removed.length - 1; i >= 0; i--) {
             const { index, tile } = frame.removed[i];
             this.model.grid[index].options.push(tile);
+
+            // AC-4: Increment supports for restored tile
+            this.model.restoreOption(index, tile);
         }
 
         // 2. Un-collapse

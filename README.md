@@ -12,6 +12,7 @@ A JavaScript implementation of the **Wave Function Collapse (WFC)** algorithm us
 This implementation goes beyond the basic WFC algorithm by incorporating several advanced techniques to ensure efficiency and robustness:
 
 -   **Optimization (Min-Heap Priority Queue)**: Instead of a naive $O(N)$ scan to find the cell with the lowest entropy, we utilize a Min-Heap. This reduces the complexity of retrieving the next cell to $O(1)$ and updating entropy to $O(\log N)$. We employ a **"Lazy Deletion"** strategy to handle stale heap entries efficiently.
+-   **Optimization (AC-4 Support Tracking)**: To optimize propagation, we implemented an Arc Consistency (AC-4) inspired algorithm. Instead of iterating over all neighbor options ($O(T)$) to check validity, we track "Support Counts" for each tile-direction pair. Propagation only occurs when a support count drops to zero, significantly reducing redundant checks.
 -   **Robustness (Backtracking History Stack)**: WFC can often reach a "contradiction" (a state where a cell has zero valid options). Our solver tracks the state history in a stack, allowing it to backtrack and attempt different choices when a dead end is encountered, significantly increasing the success rate of generation.
 -   **Organic Generation (Weighted Entropy)**: To avoid "noisy" outputs, the algorithm uses Shannon Entropy weighted by tile frequency. We specifically tuned the weights to favor land tiles, resulting in coherent 70% landmasses rather than fragmented islands.
 -   **Concurrency (Web Worker)**: The heavy WFC logic is offloaded to a dedicated Web Worker. This decouples the simulation from the UI thread, ensuring 60 FPS responsiveness even during intense calculations or large grid generation.
@@ -48,13 +49,6 @@ This architecture demonstrates how software engineering patterns can solve algor
 -   `js/tile.js`: Tile definitions and socket rules.
 -   `js/main.js`: Visualization and rendering logic (Controller/View).
 -   `css/style.css`: Styling for the interface.
-
-## Portfolio Modules
-This repository contains multiple engineering demonstrations:
-
-1.  **Wave Function Collapse** (Current Directory): Constraint-based procedural generation.
-2.  **[Verlet Physics Engine](./physics_engine/)**: Deterministic physics simulation demonstrating integration methods.
-3.  **[Spatial Partitioning](./spatial_partitioning/)**: Quadtree implementation for optimizing collision detection ($O(N \log N)$).
 
 ## Running the Project
 Since this uses ES6 Modules, you cannot run it directly from the file system (file://) due to CORS restrictions in modern browsers.
