@@ -196,7 +196,8 @@ function reset() {
         type: 'INIT',
         payload: {
             gridDim: GRID_DIM,
-            weights: weights
+            weights: weights,
+            strategy: document.getElementById('strategySelect').value
         }
     });
 }
