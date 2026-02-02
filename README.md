@@ -14,7 +14,33 @@ This implementation goes beyond the basic WFC algorithm by incorporating several
 -   **Optimization (Min-Heap Priority Queue)**: Instead of a naive $O(N)$ scan to find the cell with the lowest entropy, we utilize a Min-Heap. This reduces the complexity of retrieving the next cell to $O(1)$ and updating entropy to $O(\log N)$. We employ a **"Lazy Deletion"** strategy to handle stale heap entries efficiently.
 -   **Robustness (Backtracking History Stack)**: WFC can often reach a "contradiction" (a state where a cell has zero valid options). Our solver tracks the state history in a stack, allowing it to backtrack and attempt different choices when a dead end is encountered, significantly increasing the success rate of generation.
 -   **Organic Generation (Weighted Entropy)**: To avoid "noisy" outputs, the algorithm uses Shannon Entropy weighted by tile frequency. We specifically tuned the weights to favor land tiles, resulting in coherent 70% landmasses rather than fragmented islands.
+-   **Concurrency (Web Worker)**: The heavy WFC logic is offloaded to a dedicated Web Worker. This decouples the simulation from the UI thread, ensuring 60 FPS responsiveness even during intense calculations or large grid generation.
+-   **Performance (Message Batching)**: To handle high-speed "fast-forward" modes, worker updates are batched before being sent to the main thread. This minimizes `postMessage` overhead and serialization costs when processing more than 60 steps per second.
+-   **Interactive Tooling (Dynamic Weights)**: Users can tune biome probabilities and tile weights in real-time. This allows for dynamic shaping of the generation process (e.g., shifting from "Water World" to "Pangea") without restarting the solver.
 -   **Tools Programming (God Mode Debugger)**: The project includes an interactive debugger that allows manual constraint enforcement. Users can "paint" tiles to force the algorithm to solve around specific seeds, demonstrating the power of constraint-based procedural generation.
+
+## Algorithmic Analysis: Memory vs. Debuggability
+During development, we encountered a trade-off between **Memory Complexity** and **Tooling Features** when handling large grids (>100x100).
+
+### The Challenge
+Implementing backtracking requires saving the state of the grid. There are two primary approaches:
+1.  **Snapshotting**: Copying the entire grid state onto the stack ($O(N)$ memory per step).
+2.  **Delta Stacks**: Storing only the changes (diffs) made during propagation ($O(1)$ memory per step).
+
+### The Solution: Strategy Pattern
+We implemented a **Strategy Pattern** to support both approaches, allowing the user to switch between them at runtime based on their needs:
+
+1.  **Debug Mode (Snapshot Strategy)**:
+    -   **Pros**: Enables robust "God Mode" debugging. We can jump to any point in history, undo arbitrary steps, and manually manipulate the grid state without complex inverse calculations.
+    -   **Cons**: High memory usage ($O(N)$ per step). Capped at 100x100 grids to prevent browser OOM crashes.
+    -   **Best For**: Educational visualization, debugging constraints, small maps.
+
+2.  **Fast Mode (Delta Strategy)**:
+    -   **Pros**: Extremely memory efficient ($O(1)$ per step). Stores only the specific tile removals for each step.
+    -   **Cons**: "God Mode" is disabled because restoring state requires linear undoing of the stack; arbitrary jumps are not performant.
+    -   **Best For**: Stress testing, performance benchmarks, generating large maps (up to 200x200+).
+
+This architecture demonstrates how software engineering patterns can solve algorithmic trade-offs by deferring the decision to the user/runtime context.
 
 ## Project Structure
 -   `index.html`: Main entry point.
