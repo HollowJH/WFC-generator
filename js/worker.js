@@ -43,15 +43,16 @@ self.onmessage = function(e) {
             const count = payload && payload.count ? payload.count : 1;
             let lastChanged = false;
             for (let i = 0; i < count; i++) {
-                if (model.status !== "RUNNING") break;
-                lastChanged = model.step();
+                const stepResult = model.step();
+                if (stepResult) lastChanged = true;
+                if (model.status === "COMPLETED" || model.status === "FAILED") break;
             }
             sendUpdate(lastChanged);
             break;
 
         case 'RUN_UNTIL_DONE':
             if (!model) return;
-            while (model.status === "RUNNING") {
+            while (model.status !== "COMPLETED" && model.status !== "FAILED") {
                 model.step();
             }
             sendUpdate(true);
