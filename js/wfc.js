@@ -1,5 +1,72 @@
 import { Tile } from './tile.js';
 
+class MinHeap {
+    constructor() {
+        this.heap = [];
+    }
+
+    push(node) {
+        this.heap.push(node);
+        this.bubbleUp();
+    }
+
+    pop() {
+        if (this.size === 0) return null;
+        const min = this.heap[0];
+        const last = this.heap.pop();
+        if (this.size > 0) {
+            this.heap[0] = last;
+            this.sinkDown();
+        }
+        return min;
+    }
+
+    get size() {
+        return this.heap.length;
+    }
+
+    bubbleUp() {
+        let index = this.heap.length - 1;
+        while (index > 0) {
+            let parentIndex = Math.floor((index - 1) / 2);
+            if (this.heap[parentIndex].entropy <= this.heap[index].entropy) break;
+            [this.heap[parentIndex], this.heap[index]] = [this.heap[index], this.heap[parentIndex]];
+            index = parentIndex;
+        }
+    }
+
+    sinkDown() {
+        let index = 0;
+        const length = this.heap.length;
+        while (true) {
+            let leftChildIndex = 2 * index + 1;
+            let rightChildIndex = 2 * index + 2;
+            let swap = null;
+
+            if (leftChildIndex < length) {
+                if (this.heap[leftChildIndex].entropy < this.heap[index].entropy) {
+                    swap = leftChildIndex;
+                }
+            }
+
+            if (rightChildIndex < length) {
+                if (
+                    (swap === null && this.heap[rightChildIndex].entropy < this.heap[index].entropy) ||
+                    (swap !== null && this.heap[rightChildIndex].entropy < this.heap[leftChildIndex].entropy)
+                ) {
+                    if (this.heap[rightChildIndex].entropy < this.heap[leftChildIndex].entropy) {
+                        swap = rightChildIndex;
+                    }
+                }
+            }
+
+            if (swap === null) break;
+            [this.heap[index], this.heap[swap]] = [this.heap[swap], this.heap[index]];
+            index = swap;
+        }
+    }
+}
+
 export class Cell {
     constructor(options) {
         this.collapsed = false;
@@ -31,14 +98,22 @@ export class WFCModel {
         this.propStack = []; // For propagation
         this.stack = [];     // For backtracking history
         this.status = "READY"; // READY, RUNNING, COMPLETED, FAILED
+        this.heap = new MinHeap();
 
         this.initialize();
     }
 
     initialize() {
         this.grid = [];
+        this.heap = new MinHeap();
         for (let i = 0; i < this.size * this.size; i++) {
-            this.grid.push(new Cell(this.tiles));
+            const cell = new Cell(this.tiles);
+            this.grid.push(cell);
+            this.heap.push({
+                index: i,
+                entropy: cell.entropy() + Math.random() * 0.0001,
+                optionsCount: cell.options.length
+            });
         }
         this.propStack = [];
         this.stack = [];
@@ -110,6 +185,18 @@ export class WFCModel {
         // Remove the option that failed
         cell.options = cell.options.filter(o => o !== lastState.choice);
 
+        // Rebuild heap because grid state was restored
+        this.heap = new MinHeap();
+        for (let i = 0; i < this.grid.length; i++) {
+            if (!this.grid[i].collapsed) {
+                this.heap.push({
+                    index: i,
+                    entropy: this.grid[i].entropy() + Math.random() * 0.0001,
+                    optionsCount: this.grid[i].options.length
+                });
+            }
+        }
+
         if (cell.options.length === 0) {
             // This state itself is now invalid, backtrack further
             return this.backtrack();
@@ -130,34 +217,25 @@ export class WFCModel {
     }
 
     getLowestEntropyIndex() {
-        let minEntropy = Infinity;
-        let candidates = [];
+        while (this.heap.size > 0) {
+            const node = this.heap.pop();
+            const cell = this.grid[node.index];
 
-        for (let i = 0; i < this.grid.length; i++) {
-            const cell = this.grid[i];
-            if (!cell.collapsed) {
-                if (cell.options.length === 0) {
-                    return -2; // Contradiction
-                }
+            if (cell.collapsed) continue;
 
-                const entropy = cell.entropy();
-                // Add small noise to avoid grid artifacts
-                const noise = Math.random() * 0.0001;
-                const weightedEntropy = entropy + noise;
-
-                if (weightedEntropy < minEntropy) {
-                    minEntropy = weightedEntropy;
-                    candidates = [i];
-                } else if (Math.abs(weightedEntropy - minEntropy) < 0.00001) {
-                    candidates.push(i);
-                }
+            if (cell.options.length === 0) {
+                return -2; // Contradiction
             }
+
+            // Stale check: if the number of options in the heap doesn't match the current number of options
+            if (node.optionsCount !== cell.options.length) {
+                continue;
+            }
+
+            return node.index;
         }
 
-        if (candidates.length === 0) return -1; // All collapsed
-
-        // Pick random candidate from best
-        return candidates[Math.floor(Math.random() * candidates.length)];
+        return -1; // All collapsed
     }
 
     pickWeightedOption(options) {
@@ -213,6 +291,11 @@ export class WFCModel {
 
                     if (neighbor.options.length < originalCount) {
                         this.propStack.push(neighborIdx);
+                        this.heap.push({
+                            index: neighborIdx,
+                            entropy: neighbor.entropy() + Math.random() * 0.0001,
+                            optionsCount: neighbor.options.length
+                        });
                     }
                 }
             }
