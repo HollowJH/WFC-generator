@@ -222,8 +222,15 @@ function step() {
 function fastForward() {
     if (status === "COMPLETED" || status === "FAILED") {
         reset();
+        return;
     }
-    worker.postMessage({ type: 'RUN_UNTIL_DONE' });
+
+    showLoading("Fast Forwarding...");
+
+    // Allow UI to update before sending message
+    requestAnimationFrame(() => {
+        worker.postMessage({ type: 'RUN_UNTIL_DONE' });
+    });
 }
 
 function toggleRun() {
